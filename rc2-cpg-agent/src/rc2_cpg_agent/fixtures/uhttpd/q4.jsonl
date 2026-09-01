@@ -1,0 +1,1 @@
+{"marker":"DATAFLOW","path":[{"id":202,"code":"strtoul(value, NULL, 0)","file":"uhttpd/proc.c","line":214},{"id":303,"code":"r->content_length = len","file":"uhttpd/proc.c","line":216},{"id":404,"code":"cur_len = min(r->content_length, len)","file":"uhttpd/client.c","line":394},{"id":505,"code":"ustream_consume(s, cur_len)","file":"uhttpd/client.c","line":401}]}

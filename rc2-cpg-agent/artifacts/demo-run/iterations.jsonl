@@ -1,0 +1,5 @@
+{"iteration": 1, "query_id": "q1", "condition_id": "attacker_input", "execution_status": "success", "verdict": "verified", "duration_ms": 0}
+{"iteration": 2, "query_id": "q2", "condition_id": "numeric_conversion", "execution_status": "success", "verdict": "verified", "duration_ms": 0}
+{"iteration": 3, "query_id": "q3", "condition_id": "field_assignment", "execution_status": "success", "verdict": "verified", "duration_ms": 0}
+{"iteration": 4, "query_id": "q4", "condition_id": "dataflow_to_consume", "execution_status": "success", "verdict": "verified", "duration_ms": 0}
+{"iteration": 5, "query_id": "q5", "condition_id": "dangerous_effect", "execution_status": "success", "verdict": "verified", "duration_ms": 0}

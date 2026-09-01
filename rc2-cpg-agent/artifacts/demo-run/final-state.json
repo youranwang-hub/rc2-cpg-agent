@@ -1,0 +1,349 @@
+{
+  "case_id": "uhttpd-cve-2019-19945",
+  "hypothesis": {
+    "hypothesis_id": "CVE-2019-19945-uhttpd",
+    "title": "uhttpd attacker-controlled length reaches stream consumption",
+    "preconditions": {
+      "attacker_input": {
+        "condition_id": "attacker_input",
+        "description": "攻击者可控的 Content-Length 被解析"
+      },
+      "numeric_conversion": {
+        "condition_id": "numeric_conversion",
+        "description": "输入经 strtoul 转为长度值"
+      },
+      "field_assignment": {
+        "condition_id": "field_assignment",
+        "description": "转换结果写入 request content_length"
+      },
+      "dataflow_to_consume": {
+        "condition_id": "dataflow_to_consume",
+        "description": "该值沿数据流到达 ustream_consume"
+      },
+      "dangerous_effect": {
+        "condition_id": "dangerous_effect",
+        "description": "可控长度参与最终消费操作"
+      }
+    },
+    "status": "confirmed",
+    "verified_preconditions": [
+      "attacker_input",
+      "numeric_conversion",
+      "field_assignment",
+      "dataflow_to_consume",
+      "dangerous_effect"
+    ],
+    "refuted_preconditions": [],
+    "verification_needed": [],
+    "verification_progress": 1.0
+  },
+  "max_iterations": 10,
+  "iteration": 5,
+  "query_history": [
+    {
+      "iteration": 1,
+      "spec": {
+        "query_id": "q1",
+        "condition_id": "attacker_input",
+        "purpose": "定位 Content-Length 输入",
+        "cpgql": "cpg.literal.code(\"(?i).*content-length.*\").map(n => Map(\"marker\" -> \"INPUT\", \"id\" -> n.id, \"code\" -> n.code, \"file\" -> n.file.name, \"line\" -> n.lineNumber))",
+        "positive_marker": "INPUT"
+      },
+      "result": {
+        "query_id": "q1",
+        "status": "success",
+        "stdout": "{\"marker\":\"INPUT\",\"id\":101,\"code\":\"if (!strcasecmp(name, \\\"Content-Length\\\"))\",\"file\":\"uhttpd/proc.c\",\"line\":210}\n",
+        "stderr": "",
+        "return_code": 0,
+        "duration_ms": 0
+      },
+      "verdict": "verified",
+      "evidence_ids": [
+        "q1-t1-1"
+      ]
+    },
+    {
+      "iteration": 2,
+      "spec": {
+        "query_id": "q2",
+        "condition_id": "numeric_conversion",
+        "purpose": "定位 strtoul 数值转换",
+        "cpgql": "cpg.call.name(\"strtoul\").map(n => Map(\"marker\" -> \"CONVERSION\", \"id\" -> n.id, \"code\" -> n.code, \"file\" -> n.file.name, \"line\" -> n.lineNumber))",
+        "positive_marker": "CONVERSION"
+      },
+      "result": {
+        "query_id": "q2",
+        "status": "success",
+        "stdout": "{\"marker\":\"CONVERSION\",\"id\":202,\"code\":\"len = strtoul(value, NULL, 0)\",\"file\":\"uhttpd/proc.c\",\"line\":214}\n",
+        "stderr": "",
+        "return_code": 0,
+        "duration_ms": 0
+      },
+      "verdict": "verified",
+      "evidence_ids": [
+        "q2-t1-1"
+      ]
+    },
+    {
+      "iteration": 3,
+      "spec": {
+        "query_id": "q3",
+        "condition_id": "field_assignment",
+        "purpose": "确认 content_length 赋值",
+        "cpgql": "cpg.assignment.code(\".*content_length.*\").map(n => Map(\"marker\" -> \"ASSIGNMENT\", \"id\" -> n.id, \"code\" -> n.code, \"file\" -> n.file.name, \"line\" -> n.lineNumber))",
+        "positive_marker": "ASSIGNMENT"
+      },
+      "result": {
+        "query_id": "q3",
+        "status": "success",
+        "stdout": "{\"marker\":\"ASSIGNMENT\",\"id\":303,\"code\":\"r->content_length = len\",\"file\":\"uhttpd/proc.c\",\"line\":216}\n",
+        "stderr": "",
+        "return_code": 0,
+        "duration_ms": 0
+      },
+      "verdict": "verified",
+      "evidence_ids": [
+        "q3-t1-1"
+      ]
+    },
+    {
+      "iteration": 4,
+      "spec": {
+        "query_id": "q4",
+        "condition_id": "dataflow_to_consume",
+        "purpose": "计算 source 到 sink 的数据流",
+        "cpgql": "val src=cpg.call.name(\"strtoul\"); val sink=cpg.call.name(\"ustream_consume\"); sink.reachableByFlows(src).map(p => Map(\"marker\" -> \"DATAFLOW\", \"path\" -> p.elements.map(n => Map(\"id\" -> n.id, \"code\" -> n.code, \"file\" -> n.file.name, \"line\" -> n.lineNumber)).l))",
+        "positive_marker": "DATAFLOW"
+      },
+      "result": {
+        "query_id": "q4",
+        "status": "success",
+        "stdout": "{\"marker\":\"DATAFLOW\",\"path\":[{\"id\":202,\"code\":\"strtoul(value, NULL, 0)\",\"file\":\"uhttpd/proc.c\",\"line\":214},{\"id\":303,\"code\":\"r->content_length = len\",\"file\":\"uhttpd/proc.c\",\"line\":216},{\"id\":404,\"code\":\"cur_len = min(r->content_length, len)\",\"file\":\"uhttpd/client.c\",\"line\":394},{\"id\":505,\"code\":\"ustream_consume(s, cur_len)\",\"file\":\"uhttpd/client.c\",\"line\":401}]}\n",
+        "stderr": "",
+        "return_code": 0,
+        "duration_ms": 0
+      },
+      "verdict": "verified",
+      "evidence_ids": [
+        "q4-t1-1"
+      ]
+    },
+    {
+      "iteration": 5,
+      "spec": {
+        "query_id": "q5",
+        "condition_id": "dangerous_effect",
+        "purpose": "确认最终 ustream_consume 调用",
+        "cpgql": "cpg.call.name(\"ustream_consume\").map(n => Map(\"marker\" -> \"SINK\", \"id\" -> n.id, \"code\" -> n.code, \"file\" -> n.file.name, \"line\" -> n.lineNumber))",
+        "positive_marker": "SINK"
+      },
+      "result": {
+        "query_id": "q5",
+        "status": "success",
+        "stdout": "{\"marker\":\"SINK\",\"id\":505,\"code\":\"ustream_consume(s, cur_len)\",\"file\":\"uhttpd/client.c\",\"line\":401}\n",
+        "stderr": "",
+        "return_code": 0,
+        "duration_ms": 0
+      },
+      "verdict": "verified",
+      "evidence_ids": [
+        "q5-t1-1"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "q1-t1-1",
+      "tier": "T1",
+      "query_id": "q1",
+      "condition_id": "attacker_input",
+      "cpg_node_ids": [
+        101
+      ],
+      "source_locations": [
+        "uhttpd/proc.c:210"
+      ],
+      "code": [
+        "if (!strcasecmp(name, \"Content-Length\"))"
+      ],
+      "path": []
+    },
+    {
+      "evidence_id": "q2-t1-1",
+      "tier": "T1",
+      "query_id": "q2",
+      "condition_id": "numeric_conversion",
+      "cpg_node_ids": [
+        202
+      ],
+      "source_locations": [
+        "uhttpd/proc.c:214"
+      ],
+      "code": [
+        "len = strtoul(value, NULL, 0)"
+      ],
+      "path": []
+    },
+    {
+      "evidence_id": "q3-t1-1",
+      "tier": "T1",
+      "query_id": "q3",
+      "condition_id": "field_assignment",
+      "cpg_node_ids": [
+        303
+      ],
+      "source_locations": [
+        "uhttpd/proc.c:216"
+      ],
+      "code": [
+        "r->content_length = len"
+      ],
+      "path": []
+    },
+    {
+      "evidence_id": "q4-t1-1",
+      "tier": "T1",
+      "query_id": "q4",
+      "condition_id": "dataflow_to_consume",
+      "cpg_node_ids": [
+        202,
+        303,
+        404,
+        505
+      ],
+      "source_locations": [
+        "uhttpd/proc.c:214",
+        "uhttpd/proc.c:216",
+        "uhttpd/client.c:394",
+        "uhttpd/client.c:401"
+      ],
+      "code": [
+        "strtoul(value, NULL, 0)",
+        "r->content_length = len",
+        "cur_len = min(r->content_length, len)",
+        "ustream_consume(s, cur_len)"
+      ],
+      "path": [
+        {
+          "id": 202,
+          "code": "strtoul(value, NULL, 0)",
+          "file": "uhttpd/proc.c",
+          "line": 214
+        },
+        {
+          "id": 303,
+          "code": "r->content_length = len",
+          "file": "uhttpd/proc.c",
+          "line": 216
+        },
+        {
+          "id": 404,
+          "code": "cur_len = min(r->content_length, len)",
+          "file": "uhttpd/client.c",
+          "line": 394
+        },
+        {
+          "id": 505,
+          "code": "ustream_consume(s, cur_len)",
+          "file": "uhttpd/client.c",
+          "line": 401
+        }
+      ]
+    },
+    {
+      "evidence_id": "q5-t1-1",
+      "tier": "T1",
+      "query_id": "q5",
+      "condition_id": "dangerous_effect",
+      "cpg_node_ids": [
+        505
+      ],
+      "source_locations": [
+        "uhttpd/client.c:401"
+      ],
+      "code": [
+        "ustream_consume(s, cur_len)"
+      ],
+      "path": []
+    }
+  ],
+  "security_facts": [],
+  "repair_candidates": [],
+  "data_flow_path": [
+    {
+      "id": 202,
+      "code": "strtoul(value, NULL, 0)",
+      "file": "uhttpd/proc.c",
+      "line": 214
+    },
+    {
+      "id": 303,
+      "code": "r->content_length = len",
+      "file": "uhttpd/proc.c",
+      "line": 216
+    },
+    {
+      "id": 404,
+      "code": "cur_len = min(r->content_length, len)",
+      "file": "uhttpd/client.c",
+      "line": 394
+    },
+    {
+      "id": 505,
+      "code": "ustream_consume(s, cur_len)",
+      "file": "uhttpd/client.c",
+      "line": 401
+    }
+  ],
+  "evidence_chain": [
+    {
+      "condition_id": "attacker_input",
+      "query_id": "q1",
+      "evidence_id": "q1-t1-1",
+      "tier": "T1",
+      "nodes": [
+        101
+      ]
+    },
+    {
+      "condition_id": "numeric_conversion",
+      "query_id": "q2",
+      "evidence_id": "q2-t1-1",
+      "tier": "T1",
+      "nodes": [
+        202
+      ]
+    },
+    {
+      "condition_id": "field_assignment",
+      "query_id": "q3",
+      "evidence_id": "q3-t1-1",
+      "tier": "T1",
+      "nodes": [
+        303
+      ]
+    },
+    {
+      "condition_id": "dataflow_to_consume",
+      "query_id": "q4",
+      "evidence_id": "q4-t1-1",
+      "tier": "T1",
+      "nodes": [
+        202,
+        303,
+        404,
+        505
+      ]
+    },
+    {
+      "condition_id": "dangerous_effect",
+      "query_id": "q5",
+      "evidence_id": "q5-t1-1",
+      "tier": "T1",
+      "nodes": [
+        505
+      ]
+    }
+  ],
+  "termination_reason": "confirmed"
+}
